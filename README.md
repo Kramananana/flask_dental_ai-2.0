@@ -54,8 +54,3 @@ cd ../frontend
 # 安装依赖
 npm install
 
-# 启动开发服务器
-npm run dev
-4. 使用 Docker (推荐)我们提供了 docker-compose.yml 文件来简化部署流程。# 在项目根目录运行
-docker-compose up --build
-服务启动后，你可以在浏览器中访问 http://localhost:3000 来查看应用。📖 使用指南 (Usage)注册/登录: 创建一个新账户或使用已有账户登录。创建患者: 在“患者管理”页面，添加新的患者信息。上传影像: 进入特定患者的详情页，点击“上传影像”并选择本地的牙科影像文件。查看与分析:点击影像列表中的任意影像，进入2D浏览器。在工具栏选择“AI分析”并勾选你需要的分析项（如龋齿检测）。系统将在后台处理，完成后分析结果（如标记框）会自动叠加在影像上。查看3D影像: 如果上传的是CBCT数据，可以点击“3D视图”按钮进入三维可视化界面。🤝 贡献指南 (Contributing)我们非常欢迎社区的贡献！如果你想为这个项目做出贡献，请遵循以下步骤：Fork 本仓库。创建一个新的分支 (git checkout -b feature/YourAmazingFeature)。提交你的代码 (git commit -m 'Add some AmazingFeature')。将你的分支推送到远程仓库 (git push origin feature/YourAmazingFeature)。创建一个 Pull Request。请确保你的代码遵循项目现有的编码规范，并为新功能添加必要的测试。
