@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}AI智能医生{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-[calc(100vh-10rem)] bg-white rounded-lg shadow-md">
+    <div id="chat-history" class="flex flex-col flex-1 p-6 overflow-y-auto space-y-4">
+        </div>
+
+    <div class="p-4 bg-gray-100 border-t border-gray-200">
+        <div class="flex items-center space-x-4">
+            <textarea id="chat-input" class="flex-1 p-2 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-blue-500" rows="1" placeholder="在此输入您的问题..."></textarea>
+            <button id="send-button" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const chatHistoryEl = document.getElementById('chat-history');
+    const chatInput = document.getElementById('chat-input');
+    const sendButton = document.getElementById('send-button');
+    
+    // 直接、安全地将后端数据转换为JavaScript数组
+    // tojson 过滤器会自动处理所有特殊字符转义，确保数据安全
+    let messages = {{ history | tojson }};
+    const systemContext = {{ system_context | tojson }};
+
+    // --- 核心发送消息函数 ---
+    async function sendMessage() {
+        const userMessageContent = chatInput.value.trim();
+        if (!userMessageContent) return;
+
+        // 更新JS消息历史，并重新渲染UI
+        const userMessage = { role: 'user', content: userMessageContent };
+        messages.push(userMessage);
+        renderHistory(); 
+
+        chatInput.value = '';
+        chatInput.disabled = true;
+        sendButton.disabled = true;
+
+        // 准备要发送给后端的消息
+        let messagesToSend = [...messages]; // 创建一个副本
+        if (systemContext) {
+            messagesToSend.unshift({ role: 'system', content: systemContext });
+        }
+        
+        // 为AI的回复创建一个新的消息对象
+        const aiMessage = { role: 'assistant', content: '' };
+        messages.push(aiMessage);
+        // 先渲染一个带光标的空消息气泡
+        renderHistory(); 
+        const aiMessageWrapper = chatHistoryEl.lastChild;
+        const aiContentDiv = aiMessageWrapper.querySelector('.prose');
+
+
+        try {
+            // 发起流式请求
+            const response = await fetch("{{ url_for('chat_stream') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: messagesToSend })
+            });
+
+            if (!response.ok) throw new Error(`服务器错误: ${response.statusText}`);
+
+            // 读取并处理数据流
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value);
+                aiMessage.content += chunk; // 将数据块追加到JS对象中
+                
+                // 将完整的Markdown实时转换为HTML并更新到界面
+                aiContentDiv.innerHTML = marked.parse(aiMessage.content);
+                chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+            }
+            
+            // 可选：流结束后，可以保存一次聊天记录
+            // saveChatHistory();
+
+        } catch (error) {
+            console.error('流式传输错误:', error);
+            aiMessage.content = `抱歉，与AI服务通信时发生错误。(${error.message})`;
+            aiContentDiv.innerHTML = `<p class="text-red-400">${aiMessage.content}</p>`;
+        } finally {
+            // 恢复输入和发送按钮
+            chatInput.disabled = false;
+            sendButton.disabled = false;
+            chatInput.focus();
+        }
+    }
+
+    // --- 渲染函数，根据JavaScript数组来构建UI ---
+    function renderHistory() {
+        chatHistoryEl.innerHTML = ''; // 清空现有内容
+        messages.forEach(msg => {
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = `chat-message flex flex-col max-w-xl lg:max-w-3xl ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`;
+            
+            const authorDiv = document.createElement('div');
+            authorDiv.className = `font-bold text-sm mb-1 ${msg.role === 'user' ? 'text-right' : 'text-left'}`;
+            authorDiv.textContent = msg.role === 'user' ? "{{ session.user.username }}" : "AI智能医生";
+
+            const contentWrapper = document.createElement('div');
+            contentWrapper.className = `px-4 py-2 rounded-lg text-white w-fit ${msg.role === 'user' ? 'bg-blue-600' : 'bg-gray-600'}`;
+            
+            const proseDiv = document.createElement('div');
+            proseDiv.className = 'prose prose-invert max-w-none';
+            
+            if (msg.role === 'assistant' && msg.content === '') {
+                 proseDiv.innerHTML = '<span class="streaming-cursor">▋</span>';
+            } else {
+                 const safeContent = msg.content.replace(/```mermaid/g, '<div class="mermaid">').replace(/```/g, '</div>');
+                 proseDiv.innerHTML = marked.parse(safeContent);
+            }
+            
+            contentWrapper.appendChild(proseDiv);
+            messageWrapper.appendChild(authorDiv);
+            messageWrapper.appendChild(contentWrapper);
+            chatHistoryEl.appendChild(messageWrapper);
+        });
+        chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+    }
+    
+    // --- 初始加载 ---
+    renderHistory();
+    // 渲染页面上已有的Mermaid图表
+    mermaid.run(); 
+
+    // --- 绑定事件 ---
+    sendButton.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+
+    // --- 可选：保存聊天记录到后端 ---
+    // function saveChatHistory() {
+    //     fetch("{{ url_for('save_chat') }}", {
+    //         method: 'POST',
+    //         headers: { 'Content-Type': 'application/json' },
+    //         body: JSON.stringify({ history: messages })
+    //     });
+    // }
+});
+</script>
+<style>
+/* 聊天气泡最大宽度 */
+.chat-message.self-start {
+    max-width: 90%;
+}
+/* 闪烁光标效果 */
+@keyframes blink { 50% { opacity: 0; } }
+.streaming-cursor { animation: blink 1s step-end infinite; }
+/* 代码块样式 */
+.prose pre { background-color: #1f2937; color: #d1d5db; padding: 1em; border-radius: 0.5rem; overflow-x: auto; }
+/* Mermaid图表样式 */
+.prose .mermaid svg {
+    max-width: 100% !important;
+    height: auto !important;
+    background-color: #ffffff; /* 给图表一个白色背景，以防主题冲突 */
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+</style>
+{% endblock %}

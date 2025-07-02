@@ -1,0 +1,4 @@
+username,password_hash,role
+doctor1,$2b$12$XOwQTLI5e7NvZZ0iUNOdEO.F3pVZWQyf20NgMv8309NoUDD8weMVm,doctor
+patient1,$2b$12$ZWx16rMkxLM2OXQvy6r3T.IVc5BEH40JdQI5kif5tZOw2QQqyJpQq,patient
+admin1,$2b$12$jYiTeVhsjhG2Y4y0WnpPxe153DZFPaqLNSntF.kUWK3Xy.kPvzhgC,admin

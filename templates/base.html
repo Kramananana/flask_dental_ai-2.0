@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI牙科助手{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        [x-cloak] { display: none !important; }
+        .nav-link { display: flex; align-items: center; padding: 0.625rem 1rem; border-radius: 0.375rem; transition: all 0.2s ease-in-out; text-decoration: none; }
+        .nav-link:hover { background-color: #374151; color: #ffffff; }
+        .nav-link.active { background-color: #4f46e5; color: #ffffff; font-weight: 600; }
+        .sub-nav-link { padding-left: 3.5rem; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+    <div class="flex flex-col md:flex-row min-h-screen">
+        {% if session.user %}
+        <div class="md:flex md:flex-shrink-0">
+            <aside class="bg-gray-800 text-gray-100 w-full md:w-64 py-7 px-2 fixed inset-y-0 left-0 transform md:relative md:translate-x-0 -translate-x-full transition-transform duration-200 ease-in-out md:flex md:flex-col md:justify-between z-30" 
+                  x-data="{ open: false }" 
+                  @toggle-sidebar.window="open = !open" 
+                  @keydown.escape.window="open = false" 
+                  :class="{'translate-x-0': open, '-translate-x-full': !open}"
+                  x-show="true"
+                  @click.away="open = false">
+                
+                <div class="flex-grow">
+                    <div class="px-4 mb-10 text-center">
+                         <a href="{{ url_for('index') }}" class="text-white text-2xl font-semibold uppercase hover:text-gray-300">AI牙科助手</a>
+                    </div>
+                    
+                    <nav>
+                        {% set active_page = request.endpoint %}
+                        {% if session.user.role == 'admin' %}
+                        <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if active_page == 'admin_dashboard' %}active{% endif %}">
+                            <i class="fas fa-tachometer-alt fa-fw mr-3"></i>用户与病患
+                        </a>
+                        <a href="{{ url_for('admin_services') }}" class="nav-link {% if active_page == 'admin_services' %}active{% endif %}">
+                            <i class="fas fa-hand-holding-usd fa-fw mr-3"></i>服务项目管理
+                        </a>
+                        
+                        {% elif session.user.role == 'doctor' %}
+                        
+                        <a href="{{ url_for('doctor_reports') }}" class="nav-link {% if active_page == 'doctor_reports' %}active{% endif %}">
+                            <i class="fas fa-chart-pie fa-fw mr-3"></i>数据报表
+                        </a>
+                        <div x-data="{ open: {{ 'true' if 'patient' in active_page or active_page == 'doctor_dashboard' else 'false' }} }">
+                            <button @click="open = !open" class="nav-link w-full text-left">
+                                <i class="fas fa-users fa-fw mr-3"></i>
+                                <span>患者管理</span>
+                                <i class="fas fa-chevron-down ml-auto transition-transform" :class="{'rotate-180': open}"></i>
+                            </button>
+                            <ul x-show="open" x-transition class="mt-1 space-y-1">
+                                <li>
+                                    <a href="{{ url_for('doctor_dashboard') }}" class="nav-link sub-nav-link {% if active_page == 'doctor_dashboard' %}active{% endif %}">
+                                        <i class="fas fa-list-ul fa-fw mr-3"></i>患者列表
+                                    </a>
+                                </li>
+                                {% if patient is defined and patient %}
+                                <li>
+                                    <a href="{{ url_for('patient_detail', patient_id=patient.id) }}?tab=record" class="nav-link sub-nav-link">
+                                        <i class="fas fa-file-medical-alt fa-fw mr-3"></i>电子病历
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{{ url_for('patient_detail', patient_id=patient.id) }}?tab=xrays" class="nav-link sub-nav-link">
+                                        <i class="fas fa-x-ray fa-fw mr-3"></i>X光片
+                                    </a>
+                                </li>
+                                 <li>
+                                    <a href="{{ url_for('patient_detail', patient_id=patient.id) }}?tab=prescriptions" class="nav-link sub-nav-link">
+                                        <i class="fas fa-file-prescription fa-fw mr-3"></i>电子处方
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{{ url_for('patient_detail', patient_id=patient.id) }}?tab=finance" class="nav-link sub-nav-link">
+                                        <i class="fas fa-file-invoice-dollar fa-fw mr-3"></i>财务账单
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{{ url_for('dental_chart', patient_id=patient.id) }}" class="nav-link sub-nav-link {% if active_page == 'dental_chart' %}active{% endif %}">
+                                        <i class="fas fa-tooth fa-fw mr-3"></i>牙位图
+                                    </a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        
+                        <div x-data="{ open: {{ 'true' if 'appointment' in active_page else 'false' }} }">
+                            <button @click="open = !open" class="nav-link w-full text-left">
+                                <i class="fas fa-calendar-alt fa-fw mr-3"></i>
+                                <span>预约管理</span>
+                                <i class="fas fa-chevron-down ml-auto transition-transform" :class="{'rotate-180': open}"></i>
+                            </button>
+                            <ul x-show="open" x-transition class="mt-1 space-y-1">
+                                <li>
+                                    <a href="{{ url_for('doctor_appointments_calendar') }}" class="nav-link sub-nav-link {% if active_page == 'doctor_appointments_calendar' %}active{% endif %}">
+                                        <i class="fas fa-calendar-day fa-fw mr-3"></i>日历视图
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{{ url_for('doctor_appointments_list') }}" class="nav-link sub-nav-link {% if active_page == 'doctor_appointments_list' %}active{% endif %}">
+                                        <i class="fas fa-list-alt fa-fw mr-3"></i>列表视图
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div x-data="{ open: {{ 'true' if 'appointment' in active_page else 'false' }} }">
+                            </div>
+
+                        <a href="{{ url_for('financial_reports') }}" class="nav-link {% if active_page == 'financial_reports' %}active{% endif %}">
+                            <i class="fas fa-dollar-sign fa-fw mr-3"></i>营业额分析
+                        </a>
+
+                        <a href="{{ url_for('controller') }}" class="nav-link {% if active_page == 'controller' %}active{% endif %}">
+                            <i class="fas fa-camera-retro fa-fw mr-3"></i>远程控制器
+                        </a>
+                        <hr class="my-2 border-gray-600">
+                        <a href="{{ url_for('ai_test_page') }}" class="nav-link {% if active_page == 'ai_test_page' %}active{% endif %}">
+                            <i class="fas fa-microchip fa-fw mr-3"></i>AI识别测试
+                        </a>
+                        <a href="{{ url_for('chat') }}" class="nav-link {% if active_page == 'chat' %}active{% endif %}">
+                            <i class="fas fa-comments fa-fw mr-3"></i>AI智能医生
+                        </a>
+
+                        {% elif session.user.role == 'patient' %}
+                        {% endif %}
+                    </nav>
+                </div>
+
+                <div class="flex-shrink-0 px-4 py-2">
+                    <div class="mb-4 p-2 rounded bg-gray-700">
+                        <p class="text-sm">登录身份: <strong>{{ session.user.username }}</strong></p>
+                        <p class="text-xs text-gray-400 capitalize">角色: {{ session.user.role }}</p>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="block w-full text-center bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200">
+                        <i class="fas fa-sign-out-alt mr-2"></i>登出
+                    </a>
+                </div>
+            </aside>
+        </div>
+        {% endif %}
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+             <header class="w-full {% if session.user %} md:hidden {% endif %} bg-white shadow-md p-4 flex justify-between items-center z-20">
+                <a href="{{ url_for('index') }}" class="text-xl font-bold">AI牙科助手</a>
+                {% if session.user %}
+                <button @click="$dispatch('toggle-sidebar')" class="text-gray-500 hover:text-gray-600 focus:outline-none focus:text-gray-600">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                {% endif %}
+            </header>
+            <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 md:p-8">
+                {% include '_flash_messages.html' %}
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

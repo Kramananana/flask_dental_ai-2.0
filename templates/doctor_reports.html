@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}医生数据报表{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-3xl font-bold text-gray-800">医生数据报表</h1>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div class="lg:col-span-3 bg-white p-6 rounded-lg shadow-md">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">每月新增患者趋势</h3>
+            <div class="relative h-72">
+                <canvas id="newPatientsChart"></canvas>
+            </div>
+        </div>
+        <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">诊断病种分布</h3>
+            <div class="relative h-72 grid grid-cols-2 gap-4 items-center">
+                <div class="w-full h-full">
+                    <canvas id="diseaseDistributionChart"></canvas>
+                </div>
+                <div id="disease-legend-container" class="text-sm space-y-2">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">每月账单总额趋势</h3>
+        <div class="relative h-72">
+            <canvas id="financialsChart"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // 渲染图表的辅助函数
+    function renderBarChart(ctx, labels, data, label) {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{ label: label, data: data, backgroundColor: 'rgba(59, 130, 246, 0.5)', borderColor: 'rgba(59, 130, 246, 1)', borderWidth: 1 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+    }
+
+    function renderLineChart(ctx, labels, data, label) {
+         new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{ label: label, data: data, borderColor: 'rgba(22, 163, 74, 1)', backgroundColor: 'rgba(22, 163, 74, 0.2)', fill: true, tension: 0.1 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+        });
+    }
+
+    function renderPieChart(ctx, labels, data, legendContainer) {
+        const pieColors = ['#EF4444', '#8B5CF6', '#F59E0B', '#10B981', '#3B82F6', '#6366F1', '#EC4899'];
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{ data: data, backgroundColor: pieColors.map(c => c + 'B3'), borderColor: pieColors, borderWidth: 1 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+
+        // 动态生成右侧的图例和统计数量
+        legendContainer.innerHTML = '';
+        labels.forEach((label, index) => {
+            const count = data[index];
+            const color = pieColors[index % pieColors.length];
+            const legendItem = `
+                <div class="flex items-center">
+                    <span class="h-4 w-4 rounded-full mr-2" style="background-color: ${color};"></span>
+                    <span class="font-medium text-gray-700">${label}:</span>
+                    <span class="ml-auto font-semibold text-gray-900">${count} 例</span>
+                </div>
+            `;
+            legendContainer.innerHTML += legendItem;
+        });
+    }
+
+    // 从后端API获取所有图表的聚合数据
+    fetch("{{ url_for('api_doctor_dashboard_stats') }}")
+        .then(response => response.json())
+        .then(data => {
+            console.log("成功获取医生报表数据:", data);
+
+            // 1. 渲染每月新增患者图表
+            const newPatientsCtx = document.getElementById('newPatientsChart').getContext('2d');
+            renderBarChart(newPatientsCtx, data.monthly_new_patients.labels, data.monthly_new_patients.data, '新增患者数');
+
+            // 2. 渲染病种接诊分布图表
+            const diseaseCtx = document.getElementById('diseaseDistributionChart').getContext('2d');
+            const diseaseLegendContainer = document.getElementById('disease-legend-container');
+            renderPieChart(diseaseCtx, Object.keys(data.diagnosis_distribution), Object.values(data.diagnosis_distribution), diseaseLegendContainer);
+
+            // 3. 渲染每月账单总额图表
+            const financialsCtx = document.getElementById('financialsChart').getContext('2d');
+            renderLineChart(financialsCtx, data.monthly_revenue.labels, data.monthly_revenue.data, '账单总额 (元)');
+        });
+});
+</script>
+{% endblock %}

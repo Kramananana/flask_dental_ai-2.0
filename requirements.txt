@@ -1,0 +1,24 @@
+# Flask及相关Web服务器库 (固定在稳定版本以解决SocketIO兼容性问题)
+Flask==2.2.2
+Werkzeug==2.2.2
+
+# WebSocket通信核心库
+Flask-SocketIO==5.3.6
+python-socketio==5.11.2
+python-engineio==4.9.1
+eventlet==0.33.3
+
+# 数据库与加密
+SQLAlchemy==2.0.30
+Flask-Bcrypt==1.0.1
+
+# 图像处理
+Pillow==10.3.0
+
+# AI与数据分析 (选择与Python 3.8兼容的版本)
+numpy==1.24.4
+pandas==1.5.3
+torch==2.0.1
+torchvision==0.15.2
+tqdm==4.66.4
+ultralytics==8.0.229

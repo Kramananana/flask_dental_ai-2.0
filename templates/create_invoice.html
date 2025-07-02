@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}为 {{ patient.name }} 开具新账单{% endblock %}
+
+{% block content %}
+<div id="invoice-app" class="space-y-6">
+    <h1 class="text-3xl font-bold text-gray-800">为 {{ patient.name }} 开具新账单</h1>
+
+    <form id="invoice-form" action="{{ url_for('create_invoice', patient_id=patient.id) }}" method="POST">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">选择服务项目</h2>
+
+            <div class="flex items-end gap-4 mb-4">
+                <div class="flex-grow">
+                    <label for="service-select" class="block text-sm font-medium text-gray-700">服务项目</label>
+                    <select id="service-select" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                        <option value="" disabled selected>-- 请选择一个服务项目 --</option>
+                        {% for service in services %}
+                            <option value="{{ service.id }}">{{ service.name }} (¥{{ "%.2f"|format(service.price) }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <button id="add-item-btn" type="button" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">添加项目</button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">服务名称</th>
+                            <th class="px-6 py-3 w-32 text-center text-xs font-medium text-gray-500 uppercase">数量</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">单价</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">小计</th>
+                            <th class="px-6 py-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoice-items-body">
+                        <tr>
+                            <td colspan="5" class="text-center py-10 text-gray-500">请从上方选择服务项目并添加。</td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="bg-gray-50">
+                        <tr>
+                            <td colspan="3" class="px-6 py-3 text-right font-bold text-gray-800">总计</td>
+                            <td colspan="2" class="px-6 py-3 font-bold text-xl text-indigo-600" id="total-amount">¥0.00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="text-right mt-6">
+                <a href="{{ url_for('patient_detail', patient_id=patient.id) }}" class="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">取消</a>
+                <button id="submit-btn" type="submit" disabled class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed">生成账单</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // 【关键修正】将所有服务项目数据一次性、安全地加载到JavaScript中
+    const allServices = {{ services | tojson | safe }};
+
+    // --- 1. 获取所有需要的HTML元素 ---
+    const selectEl = document.getElementById('service-select');
+    const addItemBtn = document.getElementById('add-item-btn');
+    const tableBody = document.getElementById('invoice-items-body');
+    const totalAmountEl = document.getElementById('total-amount');
+    const submitBtn = document.getElementById('submit-btn');
+
+    // --- 2. 使用一个简单的JavaScript数组来存储账单项目 ---
+    let invoiceItems = [];
+
+    // --- 3. 核心功能函数 ---
+    function addItem() {
+        if (!selectEl.value) {
+            alert('请先选择一个服务项目。');
+            return;
+        }
+
+        // 【关键修正】根据ID在预加载的 allServices 数组中查找完整的服务信息
+        const selectedServiceId = parseInt(selectEl.value, 10);
+        const serviceData = allServices.find(s => s.id === selectedServiceId);
+
+        if (!serviceData) {
+            alert('找不到该服务项目的信息。');
+            return;
+        }
+
+        if (invoiceItems.find(item => item.id == serviceData.id)) {
+            alert('该项目已在列表中。请直接修改数量。');
+            return;
+        }
+
+        invoiceItems.push({
+            id: serviceData.id,
+            name: serviceData.name,
+            price: serviceData.price,
+            quantity: 1
+        });
+        
+        renderTable();
+        selectEl.value = "";
+    }
+
+    function removeItem(index) {
+        invoiceItems.splice(index, 1);
+        renderTable();
+    }
+
+    function renderTable() {
+        tableBody.innerHTML = '';
+        let total = 0;
+
+        if (invoiceItems.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-10 text-gray-500">请从上方选择服务项目并添加。</td></tr>';
+            submitBtn.disabled = true;
+        } else {
+            invoiceItems.forEach((item, index) => {
+                const subtotal = item.price * item.quantity;
+                total += subtotal;
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="hidden" name="service_ids[]" value="${item.id}">
+                        ${item.name}
+                    </td>
+                    <td class="px-6 py-4">
+                        <input type="number" name="quantities[]" value="${item.quantity}" min="1" class="w-24 text-center border border-gray-300 rounded-md p-1 quantity-input" data-index="${index}">
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">¥${item.price.toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap font-semibold">¥${subtotal.toFixed(2)}</td>
+                    <td class="px-6 py-4 text-right">
+                        <button type="button" class="text-red-500 hover:text-red-700 remove-item-btn" data-index="${index}">&times; 删除</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            submitBtn.disabled = false;
+        }
+        
+        totalAmountEl.textContent = `¥${total.toFixed(2)}`;
+    }
+    
+    // --- 4. 绑定事件监听 ---
+    addItemBtn.addEventListener('click', addItem);
+    tableBody.addEventListener('click', function(event) {
+        if (event.target.classList.contains('remove-item-btn')) {
+            const index = event.target.dataset.index;
+            removeItem(index);
+        }
+    });
+    tableBody.addEventListener('input', function(event) {
+        if (event.target.classList.contains('quantity-input')) {
+            const index = event.target.dataset.index;
+            const newQuantity = parseInt(event.target.value, 10);
+            if (!isNaN(newQuantity) && newQuantity >= 1) {
+                invoiceItems[index].quantity = newQuantity;
+                renderTable();
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

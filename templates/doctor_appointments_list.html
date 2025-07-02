@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}预约列表视图{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-3xl font-bold text-gray-800">预约管理 (列表视图)</h1>
+
+    <div class="bg-white p-4 rounded-lg shadow-md">
+        <form method="GET" action="{{ url_for('doctor_appointments_list') }}">
+            <div class="flex">
+                <input type="text" name="search" value="{{ search_query or '' }}" placeholder="搜索患者姓名或预约事由..." class="w-full border border-gray-300 rounded-l-md shadow-sm p-2">
+                <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-r-lg hover:bg-blue-700">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">预约时间</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">患者姓名</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">预约事由</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for appt in appointments %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-800">{{ appt.appointment_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <a href="{{ url_for('patient_detail', patient_id=appt.patient.id) }}" class="text-indigo-600 hover:underline">{{ appt.patient.name }}</a>
+                        </td>
+                        <td class="px-6 py-4 text-gray-700">{{ appt.reason }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                {% if appt.status == '已完成' %} bg-green-100 text-green-800
+                                {% elif appt.status == '已确认' %} bg-blue-100 text-blue-800
+                                {% elif appt.status == '已取消' %} bg-gray-100 text-gray-800
+                                {% else %} bg-yellow-100 text-yellow-800 {% endif %}">
+                                {{ appt.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <a href="{{ url_for('appointment_detail_doctor_view', appointment_id=appt.id) }}" class="text-indigo-600 hover:text-indigo-900">查看/处理</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center py-10 text-gray-500">
+                            {% if search_query %}
+                                未找到匹配的预约记录。
+                            {% else %}
+                                暂无预约记录。
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

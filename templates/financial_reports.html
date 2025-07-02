@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}营业额分析{% endblock %}
+
+{% block content %}
+<div x-data="financialReportPage()" class="space-y-6">
+    <h1 class="text-3xl font-bold text-gray-800">营业额分析与账单管理</h1>
+
+    <div class="bg-white p-4 rounded-lg shadow-md">
+        <form id="filter-form" @submit.prevent="loadData()" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
+                <label for="search" class="block text-sm font-medium text-gray-700">搜索患者姓名</label>
+                <input type="text" name="search" x-model="searchQuery" placeholder="输入患者姓名..." class="mt-1 w-full border border-gray-300 rounded-md shadow-sm p-2">
+            </div>
+            <div>
+                <label for="start_date" class="block text-sm font-medium text-gray-700">开始日期</label>
+                <input type="date" name="start_date" x-model="startDate" class="mt-1 w-full border border-gray-300 rounded-md shadow-sm p-2">
+            </div>
+            <div>
+                <label for="end_date" class="block text-sm font-medium text-gray-700">结束日期</label>
+                <input type="date" name="end_date" x-model="endDate" class="mt-1 w-full border border-gray-300 rounded-md shadow-sm p-2">
+            </div>
+            <div class="flex flex-col items-end">
+                 <button type="submit" class="w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">筛选/计算</button>
+                 <p class="mt-2 text-lg">
+                    筛选后总营业额: <span class="font-bold text-green-600" x-text="`¥${totalRevenue.toFixed(2)}`"></span>
+                 </p>
+            </div>
+        </form>
+    </div>
+
+    <div id="invoices-container">
+        <template x-if="isLoading">
+            <p class="text-center text-gray-500 py-10">正在加载数据...</p>
+        </template>
+        <template x-if="!isLoading && Object.keys(invoicesByMonth).length === 0">
+             <p class="text-center text-gray-500 py-10">在指定条件下未找到任何账单记录。</p>
+        </template>
+
+        <template x-for="(invoices, month) in invoicesByMonth" :key="month">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-gray-700 p-2 bg-gray-100 rounded-t-lg" x-text="month"></h2>
+                <div class="overflow-x-auto bg-white rounded-b-lg shadow-md">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">账单ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">患者</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">开具日期</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">金额</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="invoice in invoices" :key="invoice.id">
+                                <tr>
+                                    <td class="px-6 py-4" x-text="`#${invoice.id}`"></td>
+                                    <td class="px-6 py-4" x-text="invoice.patient_name"></td>
+                                    <td class="px-6 py-4" x-text="invoice.issue_date"></td>
+                                    <td class="px-6 py-4" x-text="`¥${invoice.total_amount.toFixed(2)}`"></td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full" 
+                                              :class="{ 'bg-green-100 text-green-800': invoice.status == '已付清', 'bg-yellow-100 text-yellow-800': invoice.status == '部分支付', 'bg-red-100 text-red-800': invoice.status != '已付清' && invoice.status != '部分支付' }"
+                                              x-text="invoice.status">
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <a :href="`/doctor/invoice/${invoice.id}`" class="text-indigo-600 hover:underline">查看详情</a>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function financialReportPage() {
+    return {
+        isLoading: true,
+        searchQuery: '',
+        startDate: '',
+        endDate: '',
+        totalRevenue: 0,
+        invoicesByMonth: {},
+        
+        init() {
+            this.loadData();
+        },
+
+        loadData() {
+            this.isLoading = true;
+            
+            const params = new URLSearchParams({
+                search: this.searchQuery,
+                start_date: this.startDate,
+                end_date: this.endDate
+            });
+            
+            const url = `{{ url_for('api_financial_reports_data') }}?${params.toString()}`;
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    this.totalRevenue = data.total_revenue;
+                    this.invoicesByMonth = data.invoices_by_month;
+                    this.isLoading = false;
+                })
+                .catch(error => {
+                    console.error('无法加载财务数据:', error);
+                    this.isLoading = false;
+                    alert('数据加载失败，请查看控制台。');
+                });
+        }
+    }
+}
+</script>
+{% endblock %}

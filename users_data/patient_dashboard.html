@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}我的主页{% endblock %}
+{% block header_title %}我的主页{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    {% if patient %}
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">你好, {{ patient.name }}</h1>
+            <p class="text-gray-600">这里是您的个人健康档案。</p>
+        </div>
+        <a href="{{ url_for('export_my_record_csv') }}" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300">
+            导出我的病历 (CSV)
+        </a>
+    </div>
+
+    <!-- 病历信息 -->
+    <div class="bg-white p-6 rounded-lg shadow">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-4">我的病历信息</h2>
+        <div class="space-y-6">
+             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4 border-b">
+                <div><strong class="text-gray-600">姓名:</strong> {{ patient.name }}</div>
+                <div><strong class="text-gray-600">性别:</strong> {{ patient.gender or '未记录' }}</div>
+                <div><strong class="text-gray-600">出生日期:</strong> {{ patient.dob or '未记录' }}</div>
+                <div><strong class="text-gray-600">关联医生:</strong> {{ patient.doctor.username or '未分配' }}</div>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <h3 class="font-semibold text-gray-700">主诉:</h3>
+                    <p class="text-gray-600 whitespace-pre-wrap">{{ patient.chief_complaint or '无记录' }}</p>
+                </div>
+                 <div>
+                    <h3 class="font-semibold text-gray-700">现病史:</h3>
+                    <p class="text-gray-600 whitespace-pre-wrap">{{ patient.present_illness or '无记录' }}</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-700">既往史:</h3>
+                    <p class="text-gray-600 whitespace-pre-wrap">{{ patient.past_history or '无记录' }}</p>
+                </div>
+                 <div>
+                    <h3 class="font-semibold text-gray-700">检查信息:</h3>
+                    <p class="text-gray-600 whitespace-pre-wrap">{{ patient.examination_info or '无记录' }}</p>
+                </div>
+                 <div>
+                    <h3 class="font-semibold text-gray-700">鉴别诊断:</h3>
+                    <p class="text-gray-600 whitespace-pre-wrap">{{ patient.differential_diagnosis or '无记录' }}</p>
+                </div>
+                 <div>
+                    <h3 class="font-semibold text-gray-700">治疗计划:</h3>
+                    <p class="text-gray-600 whitespace-pre-wrap">{{ patient.treatment_plan or '无记录' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- X光片 -->
+    <div class="bg-white p-6 rounded-lg shadow">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-4">我的X光片</h2>
+        <div class="space-y-6">
+            {% if patient.xrays %}
+                {% for xray in patient.xrays %}
+                <div class="border rounded-lg p-4" x-data="{ open: false }">
+                    <div class="flex justify-between items-center cursor-pointer" @click="open = !open">
+                        <p class="font-semibold">{{ xray.filename }} - <span class="text-gray-600 font-normal">{{ xray.upload_date }}</span></p>
+                        <span x-text="open ? '收起' : '展开'" class="text-blue-500"></span>
+                    </div>
+                    <div x-show="open" x-cloak class="mt-4">
+                        <img src="{{ url_for('serve_uploaded_file', filename=xray.filename) }}" class="rounded-lg max-w-full md:max-w-md h-auto">
+                        <p class="text-xs text-gray-500 mt-2">AI识别结果仅供医生查看。</p>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-gray-500">您暂无历史X光片。</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% else %}
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg" role="alert">
+        <p class="font-bold">档案未找到</p>
+        <p>系统中没有找到与您用户名 ({{ session.user.username }}) 关联的患者档案。请联系您的医生为您创建档案。</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
